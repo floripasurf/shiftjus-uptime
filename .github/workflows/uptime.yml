@@ -45,8 +45,9 @@ jobs:
             '.status == "ok" and .release_sha == $sha' \
             <<<"$health" >/dev/null
 
-          curl --fail --show-error --silent --max-time 15 \
-            --user-agent "$user_agent" "$base/djen" | grep -Fq "Mesa Shift"
+          mesa="$(curl --fail --show-error --silent --max-time 15 \
+            --user-agent "$user_agent" "$base/djen")"
+          grep -Fq "Mesa Shift" <<<"$mesa"
 
           session_status="$(curl --show-error --silent --max-time 15 \
             --output /dev/null --write-out '%{http_code}' \
