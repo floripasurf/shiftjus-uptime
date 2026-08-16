@@ -1,0 +1,124 @@
+name: Shift Jus External Uptime
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: "Force a failure to test alert delivery"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: shiftjus-external-uptime
+  cancel-in-progress: false
+
+env:
+  SHIFT_JUS_BASE_URL: https://app.shiftjus.com
+  SHIFT_JUS_EXPECTED_RELEASE_SHA: 652fb1c95acbc4df78b417b9b8c332c0749d181d
+  SHIFT_JUS_EXPECTED_MCP_STATE: disabled
+
+jobs:
+  public-edge:
+    name: Public edge probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe public wedge contract
+        env:
+          SIMULATE_FAILURE: ${{ inputs.simulate_failure || 'false' }}
+        run: |
+          set -euo pipefail
+          base="${SHIFT_JUS_BASE_URL%/}"
+          user_agent="shiftjus-external-uptime/2.0"
+
+          health="$(curl --fail --show-error --silent --max-time 15 \
+            --user-agent "$user_agent" "$base/healthz")"
+          jq -e \
+            --arg sha "$SHIFT_JUS_EXPECTED_RELEASE_SHA" \
+            '.status == "ok" and .release_sha == $sha' \
+            <<<"$health" >/dev/null
+
+          curl --fail --show-error --silent --max-time 15 \
+            --user-agent "$user_agent" "$base/djen" | grep -Fq "Mesa Shift"
+
+          session_status="$(curl --show-error --silent --max-time 15 \
+            --output /dev/null --write-out '%{http_code}' \
+            --user-agent "$user_agent" "$base/api/auth/session")"
+          test "$session_status" = "401"
+
+          metadata_status="$(curl --show-error --silent --max-time 15 \
+            --output /dev/null --write-out '%{http_code}' \
+            --user-agent "$user_agent" \
+            "$base/.well-known/oauth-protected-resource")"
+          mcp_headers="$(mktemp)"
+          trap 'rm -f "$mcp_headers"' EXIT
+          mcp_status="$(curl --show-error --silent --max-time 15 \
+            --dump-header "$mcp_headers" --output /dev/null --write-out '%{http_code}' \
+            --request POST --user-agent "$user_agent" \
+            --header 'Accept: application/json, text/event-stream' \
+            --header 'Content-Type: application/json' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
+            "$base/mcp")"
+
+          case "$SHIFT_JUS_EXPECTED_MCP_STATE" in
+            disabled)
+              test "$metadata_status" = "404"
+              test "$mcp_status" = "404"
+              ;;
+            enabled)
+              test "$metadata_status" = "200"
+              test "$mcp_status" = "401"
+              grep -Eiq '^www-authenticate:.*bearer' "$mcp_headers"
+              ;;
+            *)
+              echo "invalid expected MCP state" >&2
+              exit 2
+              ;;
+          esac
+
+          if [ "$SIMULATE_FAILURE" = "true" ]; then
+            echo "simulated failure after successful public checks" >&2
+            exit 1
+          fi
+
+      - name: Open or update uptime alert
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          label="shiftjus-uptime"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/labels" \
+            -f name="$label" -f color="B60205" \
+            -f description="External Shift Jus uptime incident" >/dev/null 2>&1 || true
+          issue="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --label "$label" --json number --jq '.[0].number // empty')"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          body="External probe failed. Run: $run_url. Expected release: $SHIFT_JUS_EXPECTED_RELEASE_SHA."
+          if [ -z "$issue" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "Shift Jus external uptime failure" --label "$label" --body "$body"
+          else
+            gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body "$body"
+          fi
+
+      - name: Close uptime alert after recovery
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          label="shiftjus-uptime"
+          gh issue list --repo "$GITHUB_REPOSITORY" --state open --label "$label" \
+            --json number --jq '.[].number' | while read -r issue; do
+              [ -n "$issue" ] || continue
+              gh issue close "$issue" --repo "$GITHUB_REPOSITORY" \
+                --comment "External probe recovered in $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID."
+            done
