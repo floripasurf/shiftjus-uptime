@@ -21,7 +21,7 @@ concurrency:
 
 env:
   SHIFT_JUS_BASE_URL: https://app.shiftjus.com
-  SHIFT_JUS_EXPECTED_RELEASE_SHA: 652fb1c95acbc4df78b417b9b8c332c0749d181d
+  SHIFT_JUS_EXPECTED_RELEASE_SHA: 70a3bdfa779fae28ab51fb82e5f809cfec41b320
   SHIFT_JUS_EXPECTED_MCP_STATE: disabled
   # Preencher com o issuer HTTPS exato (incluindo / final) antes de habilitar MCP.
   SHIFT_JUS_EXPECTED_AUTH_ISSUER: ""
