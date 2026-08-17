@@ -23,6 +23,8 @@ env:
   SHIFT_JUS_BASE_URL: https://app.shiftjus.com
   SHIFT_JUS_EXPECTED_RELEASE_SHA: 652fb1c95acbc4df78b417b9b8c332c0749d181d
   SHIFT_JUS_EXPECTED_MCP_STATE: disabled
+  # Preencher com o issuer HTTPS exato (incluindo / final) antes de habilitar MCP.
+  SHIFT_JUS_EXPECTED_AUTH_ISSUER: ""
 
 jobs:
   public-edge:
@@ -54,12 +56,13 @@ jobs:
             --user-agent "$user_agent" "$base/api/auth/session")"
           test "$session_status" = "401"
 
+          metadata_file="$(mktemp)"
           metadata_status="$(curl --show-error --silent --max-time 15 \
-            --output /dev/null --write-out '%{http_code}' \
+            --output "$metadata_file" --write-out '%{http_code}' \
             --user-agent "$user_agent" \
-            "$base/.well-known/oauth-protected-resource")"
+            "$base/.well-known/oauth-protected-resource/mcp")"
           mcp_headers="$(mktemp)"
-          trap 'rm -f "$mcp_headers"' EXIT
+          trap 'rm -f "$metadata_file" "$mcp_headers"' EXIT
           mcp_status="$(curl --show-error --silent --max-time 15 \
             --dump-header "$mcp_headers" --output /dev/null --write-out '%{http_code}' \
             --request POST --user-agent "$user_agent" \
@@ -76,7 +79,18 @@ jobs:
             enabled)
               test "$metadata_status" = "200"
               test "$mcp_status" = "401"
+              test -n "$SHIFT_JUS_EXPECTED_AUTH_ISSUER"
+              jq -e \
+                --arg resource "$base/mcp" \
+                --arg issuer "$SHIFT_JUS_EXPECTED_AUTH_ISSUER" \
+                '.resource == $resource
+                 and (.authorization_servers | index($issuer)) != null
+                 and (.scopes_supported | index("shiftjus:context:read")) != null' \
+                "$metadata_file" >/dev/null
               grep -Eiq '^www-authenticate:.*bearer' "$mcp_headers"
+              grep -Fq \
+                "resource_metadata=\"$base/.well-known/oauth-protected-resource/mcp\"" \
+                "$mcp_headers"
               ;;
             *)
               echo "invalid expected MCP state" >&2
