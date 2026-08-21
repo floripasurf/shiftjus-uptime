@@ -23,6 +23,8 @@ env:
   SHIFT_JUS_BASE_URL: https://app.shiftjus.com
   SHIFT_JUS_EXPECTED_RELEASE_SHA: 70a3bdfa779fae28ab51fb82e5f809cfec41b320
   SHIFT_JUS_EXPECTED_MCP_STATE: enabled
+  # Flip only after the PostgreSQL Public Index deployment and restore gate.
+  SHIFT_JUS_EXPECTED_PUBLIC_INDEX_STATE: disabled
   # Preencher com o issuer HTTPS exato (incluindo / final) antes de habilitar MCP.
   SHIFT_JUS_EXPECTED_AUTH_ISSUER: "https://dev-20ngkyf22od420qh.us.auth0.com/"
 
@@ -62,7 +64,8 @@ jobs:
             --user-agent "$user_agent" \
             "$base/.well-known/oauth-protected-resource/mcp")"
           mcp_headers="$(mktemp)"
-          trap 'rm -f "$metadata_file" "$mcp_headers"' EXIT
+          public_index_file="$(mktemp)"
+          trap 'rm -f "$metadata_file" "$mcp_headers" "$public_index_file"' EXIT
           mcp_status="$(curl --show-error --silent --max-time 15 \
             --dump-header "$mcp_headers" --output /dev/null --write-out '%{http_code}' \
             --request POST --user-agent "$user_agent" \
@@ -94,6 +97,30 @@ jobs:
               ;;
             *)
               echo "invalid expected MCP state" >&2
+              exit 2
+              ;;
+          esac
+
+          public_index_status="$(curl --show-error --silent --max-time 15 \
+            --output "$public_index_file" --write-out '%{http_code}' \
+            --user-agent "$user_agent" "$base/api/public-index/health")"
+          case "$SHIFT_JUS_EXPECTED_PUBLIC_INDEX_STATE" in
+            disabled)
+              test "$public_index_status" = "404"
+              ;;
+            enabled)
+              test "$public_index_status" = "200"
+              jq -e \
+                '.status == "ok"
+                 and (.worker_count | type == "number" and . > 0)
+                 and (.expected_worker_count | type == "number" and . > 0)
+                 and (.healthy_instance_count | type == "number" and . > 0)
+                 and (.updated_at | type == "string")
+                 and (.partition_horizon_months | type == "number" and . >= 2)' \
+                "$public_index_file" >/dev/null
+              ;;
+            *)
+              echo "invalid expected Public Index state" >&2
               exit 2
               ;;
           esac
