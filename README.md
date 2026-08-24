@@ -10,6 +10,7 @@ roda fora da infraestrutura da Shift a cada cinco minutos e valida:
 - disponibilidade da Mesa Shift;
 - sessão anônima fechada;
 - estado esperado de OAuth e MCP.
+- saúde do Public Index e presença dos workers esperados.
 
 Falhas abrem ou atualizam uma única issue com o label `shiftjus-uptime`.
 Recuperações fecham o alerta. O repositório não contém credenciais, OAB, CNJ,

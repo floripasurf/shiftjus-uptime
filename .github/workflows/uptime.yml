@@ -21,10 +21,10 @@ concurrency:
 
 env:
   SHIFT_JUS_BASE_URL: https://app.shiftjus.com
-  SHIFT_JUS_EXPECTED_RELEASE_SHA: 70a3bdfa779fae28ab51fb82e5f809cfec41b320
+  SHIFT_JUS_EXPECTED_RELEASE_SHA: bec9332c7865827c7a87f4b5a04bbf082c382bb8
   SHIFT_JUS_EXPECTED_MCP_STATE: enabled
-  # Flip only after the PostgreSQL Public Index deployment and restore gate.
-  SHIFT_JUS_EXPECTED_PUBLIC_INDEX_STATE: disabled
+  # Flip to enabled only after the collection workers are activated.
+  SHIFT_JUS_EXPECTED_PUBLIC_INDEX_STATE: standby
   # Preencher com o issuer HTTPS exato (incluindo / final) antes de habilitar MCP.
   SHIFT_JUS_EXPECTED_AUTH_ISSUER: "https://dev-20ngkyf22od420qh.us.auth0.com/"
 
@@ -107,6 +107,17 @@ jobs:
           case "$SHIFT_JUS_EXPECTED_PUBLIC_INDEX_STATE" in
             disabled)
               test "$public_index_status" = "404"
+              ;;
+            standby)
+              test "$public_index_status" = "200"
+              jq -e \
+                '.status == "ok"
+                 and .worker_count == 0
+                 and .expected_worker_count == 0
+                 and .healthy_instance_count == 0
+                 and .updated_at == null
+                 and (.partition_horizon_months | type == "number" and . >= 2)' \
+                "$public_index_file" >/dev/null
               ;;
             enabled)
               test "$public_index_status" = "200"
