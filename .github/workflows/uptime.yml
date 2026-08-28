@@ -21,7 +21,7 @@ concurrency:
 
 env:
   SHIFT_JUS_BASE_URL: https://app.shiftjus.com
-  SHIFT_JUS_EXPECTED_RELEASE_SHA: bec9332c7865827c7a87f4b5a04bbf082c382bb8
+  SHIFT_JUS_EXPECTED_RELEASE_SHA: 1dcea5c2053ded00a623e00dae87885d9a5b98f9
   SHIFT_JUS_EXPECTED_MCP_STATE: enabled
   # Flip to enabled only after the collection workers are activated.
   SHIFT_JUS_EXPECTED_PUBLIC_INDEX_STATE: standby
