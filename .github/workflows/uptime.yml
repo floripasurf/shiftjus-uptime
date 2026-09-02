@@ -25,6 +25,8 @@ env:
   SHIFT_JUS_EXPECTED_MCP_STATE: enabled
   # Public Index workers are active and must keep publishing fresh heartbeats.
   SHIFT_JUS_EXPECTED_PUBLIC_INDEX_STATE: enabled
+  # Optional. Set only after the authenticated Mini heartbeat is proven.
+  SHIFT_WALG_STATUS_URL: ${{ vars.SHIFT_WALG_STATUS_URL }}
   # Preencher com o issuer HTTPS exato (incluindo / final) antes de habilitar MCP.
   SHIFT_JUS_EXPECTED_AUTH_ISSUER: "https://dev-20ngkyf22od420qh.us.auth0.com/"
 
@@ -65,7 +67,8 @@ jobs:
             "$base/.well-known/oauth-protected-resource/mcp")"
           mcp_headers="$(mktemp)"
           public_index_file="$(mktemp)"
-          trap 'rm -f "$metadata_file" "$mcp_headers" "$public_index_file"' EXIT
+          walg_status_file="$(mktemp)"
+          trap 'rm -f "$metadata_file" "$mcp_headers" "$public_index_file" "$walg_status_file"' EXIT
           mcp_status="$(curl --show-error --silent --max-time 15 \
             --dump-header "$mcp_headers" --output /dev/null --write-out '%{http_code}' \
             --request POST --user-agent "$user_agent" \
@@ -135,6 +138,18 @@ jobs:
               exit 2
               ;;
           esac
+
+          if [ -n "$SHIFT_WALG_STATUS_URL" ]; then
+            walg_status="$(curl --show-error --silent --max-time 15 \
+              --output "$walg_status_file" --write-out '%{http_code}' \
+              --user-agent "$user_agent" "$SHIFT_WALG_STATUS_URL")"
+            test "$walg_status" = "200"
+            jq -e \
+              '.service == "macmini-postgresql17-walg"
+               and .status == "ok"
+               and .ok == true' \
+              "$walg_status_file" >/dev/null
+          fi
 
           if [ "$SIMULATE_FAILURE" = "true" ]; then
             echo "simulated failure after successful public checks" >&2
