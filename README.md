@@ -11,6 +11,8 @@ roda fora da infraestrutura da Shift a cada cinco minutos e valida:
 - sessão anônima fechada;
 - estado esperado de OAuth e MCP.
 - saúde do Public Index e presença dos workers esperados.
+- quando configurado, presença e saúde do heartbeat PostgreSQL/WAL-G recebido
+  fora do Mac Mini.
 
 Falhas abrem ou atualizam uma única issue com o label `shiftjus-uptime`.
 Recuperações fecham o alerta. O repositório não contém credenciais, OAB, CNJ,
@@ -23,8 +25,11 @@ conteúdo processual ou dados de tenants.
 2. Copiar este `README.md` e `uptime.yml` para a raiz e para
    `.github/workflows/uptime.yml` do novo repositório.
 3. Atualizar `SHIFT_JUS_EXPECTED_RELEASE_SHA` para a release ativa.
-4. Disparar `workflow_dispatch` com `simulate_failure=true` e confirmar a issue.
-5. Disparar novamente sem simulação e confirmar o fechamento da issue.
-6. Confirmar uma execução agendada bem-sucedida.
-7. Atualizar `stability-soak.json`; a data da primeira execução agendada válida é
+4. Depois de provar o receptor WAL-G, definir a variável de repositório
+   `SHIFT_WALG_STATUS_URL`. Ela é uma URL pública de status e não contém token.
+   Enquanto ausente, o workflow preserva o comportamento atual.
+5. Disparar `workflow_dispatch` com `simulate_failure=true` e confirmar a issue.
+6. Disparar novamente sem simulação e confirmar o fechamento da issue.
+7. Confirmar uma execução agendada bem-sucedida.
+8. Atualizar `stability-soak.json`; a data da primeira execução agendada válida é
    o único `started_at` aceito.
