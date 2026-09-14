@@ -43,24 +43,24 @@ jobs:
           base="${SHIFT_JUS_BASE_URL%/}"
           user_agent="shiftjus-external-uptime/2.0"
 
-          health="$(curl --fail --show-error --silent --max-time 15 \
+          health="$(curl --compressed --fail --show-error --silent --max-time 15 \
             --user-agent "$user_agent" "$base/healthz")"
           jq -e \
             --arg sha "$SHIFT_JUS_EXPECTED_RELEASE_SHA" \
             '.status == "ok" and .release_sha == $sha' \
             <<<"$health" >/dev/null
 
-          mesa="$(curl --fail --show-error --silent --max-time 15 \
+          mesa="$(curl --compressed --fail --show-error --silent --max-time 15 \
             --user-agent "$user_agent" "$base/djen")"
           grep -Fq "Mesa Shift" <<<"$mesa"
 
-          session_status="$(curl --show-error --silent --max-time 15 \
+          session_status="$(curl --compressed --show-error --silent --max-time 15 \
             --output /dev/null --write-out '%{http_code}' \
             --user-agent "$user_agent" "$base/api/auth/session")"
           test "$session_status" = "401"
 
           metadata_file="$(mktemp)"
-          metadata_status="$(curl --show-error --silent --max-time 15 \
+          metadata_status="$(curl --compressed --show-error --silent --max-time 15 \
             --output "$metadata_file" --write-out '%{http_code}' \
             --user-agent "$user_agent" \
             "$base/.well-known/oauth-protected-resource/mcp")"
@@ -68,7 +68,7 @@ jobs:
           public_index_file="$(mktemp)"
           walg_status_file="$(mktemp)"
           trap 'rm -f "$metadata_file" "$mcp_headers" "$public_index_file" "$walg_status_file"' EXIT
-          mcp_status="$(curl --show-error --silent --max-time 15 \
+          mcp_status="$(curl --compressed --show-error --silent --max-time 15 \
             --dump-header "$mcp_headers" --output /dev/null --write-out '%{http_code}' \
             --request POST --user-agent "$user_agent" \
             --header 'Accept: application/json, text/event-stream' \
@@ -103,7 +103,7 @@ jobs:
               ;;
           esac
 
-          public_index_status="$(curl --show-error --silent --max-time 15 \
+          public_index_status="$(curl --compressed --show-error --silent --max-time 15 \
             --output "$public_index_file" --write-out '%{http_code}' \
             --user-agent "$user_agent" "$base/api/public-index/health")"
           case "$SHIFT_JUS_EXPECTED_PUBLIC_INDEX_STATE" in
@@ -139,14 +139,15 @@ jobs:
           esac
 
           if [ -n "$SHIFT_WALG_STATUS_URL" ]; then
-            walg_status="$(curl --show-error --silent --max-time 15 \
+            walg_status="$(curl --compressed --show-error --silent --max-time 15 \
               --output "$walg_status_file" --write-out '%{http_code}' \
               --user-agent "$user_agent" "$SHIFT_WALG_STATUS_URL")"
             test "$walg_status" = "200"
             jq -e \
-              '.service == "macmini-postgresql17-walg"
-               and .status == "ok"
-               and .ok == true' \
+              '.schema_version == 2
+               and .service == "macmini-postgresql17-walg"
+               and (.clusters | keys) == ["juris"]
+               and .clusters.juris.ok == true' \
               "$walg_status_file" >/dev/null
           fi
 
