@@ -26,7 +26,8 @@ conteúdo processual ou dados de tenants.
    `.github/workflows/uptime.yml` do novo repositório.
 3. Atualizar `SHIFT_JUS_EXPECTED_RELEASE_SHA` para a release ativa.
 4. Depois de provar o receptor WAL-G, definir a variável de repositório
-   `SHIFT_WALG_STATUS_URL`. Ela é uma URL pública de status e não contém token.
+   `SHIFT_WALG_STATUS_URL`, apontando para o estado isolado `/status/juris`.
+   Ela é uma URL pública de status e não contém token.
    Enquanto ausente, o workflow preserva o comportamento atual.
 5. Disparar `workflow_dispatch` com `simulate_failure=true` e confirmar a issue.
 6. Disparar novamente sem simulação e confirmar o fechamento da issue.
