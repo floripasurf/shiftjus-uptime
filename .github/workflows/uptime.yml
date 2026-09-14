@@ -144,9 +144,10 @@ jobs:
               --user-agent "$user_agent" "$SHIFT_WALG_STATUS_URL")"
             test "$walg_status" = "200"
             jq -e \
-              '.service == "macmini-postgresql17-walg"
-               and .status == "ok"
-               and .ok == true' \
+              '.schema_version == 2
+               and .service == "macmini-postgresql17-walg"
+               and (.clusters | keys) == ["juris"]
+               and .clusters.juris.ok == true' \
               "$walg_status_file" >/dev/null
           fi
 
