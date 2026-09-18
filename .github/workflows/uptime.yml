@@ -21,7 +21,7 @@ concurrency:
 
 env:
   SHIFT_JUS_BASE_URL: https://app.shiftjus.com
-  SHIFT_JUS_EXPECTED_RELEASE_SHA: f2de53e26d3d1fba7d644a7139469d0b33535022
+  SHIFT_JUS_EXPECTED_RELEASE_SHA: efe29e623a4440a98ebde06910461978c31c0bed
   SHIFT_JUS_EXPECTED_MCP_STATE: enabled
   # Public Index workers are active and must keep publishing fresh heartbeats.
   SHIFT_JUS_EXPECTED_PUBLIC_INDEX_STATE: enabled
